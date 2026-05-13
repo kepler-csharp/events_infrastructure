@@ -38,7 +38,7 @@
                └────────────────┘
 ```
 
-![Architecture](.architecture.png)
+![Architecture](architecture.png)
 
 
 Routes:
