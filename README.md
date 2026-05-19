@@ -61,6 +61,40 @@ This project provides enterprise-grade authentication features including:
 
 ![Architecture](architecture.png)
 
+---
+
+## Project Strucutre
+```txt
+ApiGeneral/
+│
+├── AuthApi/
+│   ├── Controllers/
+│   │   ├── AuthController.cs         ← Login, logout, register, photo upload, refresh
+│   │   └── DomainControllers.cs      ← Venues, Events, Showtimes, Seats,
+│   │                                     Orders, Scanner, Admin
+│   ├── Data/
+│   │   └── AppDbContext.cs           ← Identity + domain tables
+│   ├── DTOs/
+│   │   └── Dtos.cs                   ← Request/response DTOs
+│   ├── Entities/
+│   │   ├── ApplicationUser.cs        ← Extends IdentityUser
+│   │   └── DomainEntities.cs         ← Venue, Event, Showtime, Seat,
+│   │                                     Order, OrderItem, Payment, Ticket, TicketValidation
+│   ├── Services/
+│   │   ├── Interfaces/IServices.cs   ← Service contracts
+│   │   ├── AuthControllerService.cs  ← Authentication logic
+│   │   ├── JwtService.cs             ← JWT generation
+│   │   ├── VenueAndEventService.cs   ← Venues and events
+│   │   ├── ShowtimeAndSeatService.cs ← Showtimes and seat reservations
+│   │   ├── OrderService.cs           ← Orders and payments
+│   │   └── ScannerAndAdminService.cs ← QR validation and dashboard
+│   └── Seed/
+│       └── SeedData.cs               ← Users, venues, events, showtimes
+│
+├── Program.cs
+├── appsettings.json
+└── ApiGeneral.csproj
+```
 
 # Technologies
 
@@ -116,26 +150,6 @@ This project provides enterprise-grade authentication features including:
 | Customer | customer@tickets.com | Customer1234! |
 | Scanner | scanner@tickets.com | Scanner1234! |
 | Receptionist | receptionist@tickets.com | Recept1234! |
-
----
-
-# Project Structure
-
-```txt
-ApiGeneral/
-│
-├── AuthApi/
-│   ├── Controllers/
-│   ├── Data/
-│   ├── DTOs/
-│   ├── Entities/
-│   ├── Services/
-│   ├── Seed/
-│
-├── Program.cs
-├── appsettings.json
-├── ApiGeneral.csproj
-```
 
 ---
 
@@ -451,6 +465,106 @@ This provides immediate logout invalidation.
 
 ---
 
+## API Endpoints
+
+### Auth (`/api/auth`)
+| Method | Endpoint                          | Access             | Description                          |
+| ------ | --------------------------------- | ------------------ | ------------------------------------ |
+| POST   | `/api/auth/login`                 | Public             | Login → JWT + refresh token          |
+| POST   | `/api/auth/logout`                | Authenticated      | Invalidates token in Redis blacklist |
+| POST   | `/api/auth/refresh`               | Public             | Generate new access token            |
+| POST   | `/api/auth/register-customer`     | Public             | Register customer                    |
+| POST   | `/api/auth/register-admin`        | Admin              | Create admin                         |
+| POST   | `/api/auth/register-scanner`      | Admin/Scanner      | Create scanner                       |
+| POST   | `/api/auth/register-receptionist` | Admin/Receptionist | Create receptionist                  |
+| POST   | `/api/auth/upload-photo`          | Authenticated      | Upload profile photo → MinIO         |
+| POST   | `/api/auth/change-password`       | Authenticated      | Change password                      |
+| POST   | `/api/auth/forgot-password`       | Public             | Request password reset               |
+| POST   | `/api/auth/reset-password`        | Public             | Confirm password reset               |
+
+Venues (`/api/venues`)
+| Method | Endpoint           | Access | Description             |
+| ------ | ------------------ | ------ | ----------------------- |
+| GET    | `/api/venues`      | Public | List venues (paginated) |
+| GET    | `/api/venues/{id}` | Public | Venue details           |
+| POST   | `/api/venues`      | Admin  | Create venue            |
+| DELETE | `/api/venues/{id}` | Admin  | Disable venue           |
+
+Events (`/api/events`)
+| Method | Endpoint           | Access | Description                                       |
+| ------ | ------------------ | ------ | ------------------------------------------------- |
+| GET    | `/api/events`      | Public | List events (`?isActive=true&page=1&pageSize=20`) |
+| GET    | `/api/events/{id}` | Public | Event details                                     |
+| POST   | `/api/events`      | Admin  | Create event                                      |
+| PUT    | `/api/events/{id}` | Admin  | Update event                                      |
+| DELETE | `/api/events/{id}` | Admin  | Disable event                                     |
+
+Showtimes (`/api/showtimes`)
+| Method | Endpoint                    | Access | Description                      |
+| ------ | --------------------------- | ------ | -------------------------------- |
+| GET    | `/api/showtimes`            | Public | List showtimes (`?eventId=1`)    |
+| GET    | `/api/showtimes/{id}`       | Public | Showtime details                 |
+| GET    | `/api/showtimes/{id}/seats` | Public | Seat map                         |
+| POST   | `/api/showtimes`            | Admin  | Create showtime with seat layout |
+
+Seats (`/api/seats`)
+| Method | Endpoint             | Access        | Description                          |
+| ------ | -------------------- | ------------- | ------------------------------------ |
+| POST   | `/api/seats/reserve` | Authenticated | Reserve seats (Redis lock for 5 min) |
+| POST   | `/api/seats/release` | Authenticated | Release reservation                  |
+
+Orders (`/api/orders`)
+| Method | Endpoint           | Access        | Description                      |
+| ------ | ------------------ | ------------- | -------------------------------- |
+| POST   | `/api/orders`      | Authenticated | Create order from reserved seats |
+| POST   | `/api/orders/pay`  | Authenticated | Pay order → generates QR tickets |
+| GET    | `/api/orders`      | Authenticated | User orders                      |
+| GET    | `/api/orders/{id}` | Authenticated | Order details                    |
+
+Scanner (`/api/scanner`)
+| Method | Endpoint                | Access                     | Description                  |
+| ------ | ----------------------- | -------------------------- | ---------------------------- |
+| POST   | `/api/scanner/validate` | Admin/Scanner/Receptionist | Validate QR code at entrance |
+
+Admin (`/api/admin`)
+| Method | Endpoint               | Access | Description                                              |
+| ------ | ---------------------- | ------ | -------------------------------------------------------- |
+| GET    | `/api/admin/dashboard` | Admin  | Stats: sales, occupancy, revenue (Redis cache for 5 min) |
+
+---
+
+## Complete Purchase Flow
+
+```
+1. POST /api/auth/login              → JWT token
+2. GET  /api/showtimes/{id}/seats    → View available seats
+3. POST /api/seats/reserve           → Reserve seats (5 min Redis lock)
+4. POST /api/orders                  → Create order
+5. POST /api/orders/pay              → Pay → QR tickets generated
+6. POST /api/scanner/validate        → Validate QR at entrance
+```
+
+# Role Assignment
+
+Each endpoint automatically assigns the corresponding ASP.NET Identity role.
+
+Roles are stored in:
+
+- AspNetRoles
+- AspNetUserRoles
+- AspNetUsers
+---
+
+## Redis System
+
+| Purpose         | Key                  | TTL                            |
+| --------------- | -------------------- | ------------------------------ |
+| JWT Blacklist   | `blacklist:{token}`  | Until token expiration         |
+| Seat Lock       | `seat_lock:{seatId}` | 10 seconds (during processing) |
+| Dashboard Cache | `admin:dashboard`    | 5 minutes                      |
+
+---
+
 # Docker Cleanup
 
 Stop Redis:
@@ -513,86 +627,50 @@ docker compose down
 
 ---
 
-# Role Registration Endpoints
-
-## Register Admin
-
-```http
-POST /api/auth/register-admin
-```
-
-Authorization:
+## Seed Data Included
 
 ```txt
-Admin only
+- 2 Venues: Cinépolis Premium and Teatro Metropolitano (Medellín)
+- 2 Events: Inception (movie) and Rock en Vivo 2025 (concert)
+- 2 Showtimes with pre-generated seats:
+    - Inception: 60 seats (rows A-F, 10 seats per row, E/F = Premium)
+    - Rock en Vivo: 100 seats (rows 1-5, 20 seats per row, row 1 = VIP)
 ```
 
----
-
-## Register Customer
-
-```http
-POST /api/auth/register-customer
-```
-
-Authorization:
+## Example Request Body — Create Showtime with Seats
 
 ```txt
-Public
-```
-
----
-
-## Register Scanner
-
-```http
-POST /api/auth/register-scanner
-```
-
-Authorization:
-
-```txt
-Admin & Scanner only
-```
-
----
-
-## Register Receptionist
-
-```http
-POST /api/auth/register-receptionist
-```
-
-Authorization:
-
-```txt
-Admin & Receptionist only
-```
-
----
-
-# Registration Request Body
-
-```json
+POST /api/showtimes
 {
-  "email": "user@example.com",
-  "password": "Password123!"
+  "eventId": 1,
+  "startTime": "2025-09-15T20:00:00Z",
+  "basePrice": 25000,
+  "seatLayout": [
+    { "row": "A", "seatCount": 10, "type": 0 },
+    { "row": "B", "seatCount": 10, "type": 0 },
+    { "row": "C", "seatCount": 8,  "type": 1 }
+  ]
+}
+```
+## Example Request Body — Reserve Seats
+
+```
+POST /api/seats/reserve
+{
+  "showtimeId": 1,
+  "seatIds": [1, 2, 3]
 }
 ```
 
----
+## Example Request Body — Validate QR
 
-# Role Assignment
-
-Each endpoint automatically assigns the corresponding ASP.NET Identity role.
-
-Roles are stored in:
-
-- AspNetRoles
-- AspNetUserRoles
-- AspNetUsers
----
-
+```
+POST /api/scanner/validate
+{
+  "qrCode": "VFM6MToxNzM...",
+  "deviceInfo": "Scanner-Device-001"
+}
+```
 # License
 
 This project is intended for educational and development purposes.
