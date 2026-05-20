@@ -1,5 +1,6 @@
 using ApiGeneral.AuthApi.Data;
 using ApiGeneral.AuthApi.Entities;
+using ApiGeneral.AuthApi.Entities.Enums;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 

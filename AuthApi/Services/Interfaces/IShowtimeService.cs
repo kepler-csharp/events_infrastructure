@@ -1,4 +1,6 @@
-using ApiGeneral.AuthApi.DTOs;
+using ApiGeneral.AuthApi.DTOs.SeatDTOs;
+using ApiGeneral.AuthApi.DTOs.Shared;
+using ApiGeneral.AuthApi.DTOs.ShowtimesDTOs;
 
 namespace ApiGeneral.AuthApi.Services.Interfaces;
 

@@ -1,10 +1,11 @@
 using ApiGeneral.AuthApi.Data;
-using ApiGeneral.AuthApi.DTOs;
 using ApiGeneral.AuthApi.Entities;
 using ApiGeneral.AuthApi.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using System.Text.Json;
+using ApiGeneral.AuthApi.DTOs.DashboardDTOs;
+using ApiGeneral.AuthApi.DTOs.TicketDTOs;
 using ApiGeneral.AuthApi.Entities.Enums;
 
 namespace ApiGeneral.AuthApi.Services;

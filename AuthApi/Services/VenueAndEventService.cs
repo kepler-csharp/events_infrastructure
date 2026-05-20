@@ -1,5 +1,7 @@
 using ApiGeneral.AuthApi.Data;
-using ApiGeneral.AuthApi.DTOs;
+using ApiGeneral.AuthApi.DTOs.EventDTOs;
+using ApiGeneral.AuthApi.DTOs.Shared;
+using ApiGeneral.AuthApi.DTOs.VenueDTOs;
 using ApiGeneral.AuthApi.Entities;
 using ApiGeneral.AuthApi.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;

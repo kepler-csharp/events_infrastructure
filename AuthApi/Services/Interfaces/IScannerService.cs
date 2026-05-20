@@ -1,4 +1,4 @@
-using ApiGeneral.AuthApi.DTOs;
+using ApiGeneral.AuthApi.DTOs.TicketDTOs;
 
 namespace ApiGeneral.AuthApi.Services.Interfaces;
 

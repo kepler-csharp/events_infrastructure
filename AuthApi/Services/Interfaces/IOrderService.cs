@@ -1,4 +1,5 @@
-using ApiGeneral.AuthApi.DTOs;
+using ApiGeneral.AuthApi.DTOs.OrderDTOs;
+using ApiGeneral.AuthApi.DTOs.Shared;
 
 namespace ApiGeneral.AuthApi.Services.Interfaces;
 
