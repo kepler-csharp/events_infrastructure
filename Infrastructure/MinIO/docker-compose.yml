@@ -1,85 +1,32 @@
 version: '3.9'
 
 services:
-
-  api:
-    container_name: tickets-api-general
-    build:
-      context: .
-      dockerfile: Dockerfile
-
-    ports:
-      - "5201:8080"
-
-    depends_on:
-      - mysql
-      - redis
-      - minio
-
-    environment:
-      ASPNETCORE_ENVIRONMENT: Development
-
-      ConnectionStrings__DefaultConnection: server=mysql;port=3306;database=tickets_api_general;user=root;password=rootpassword
-
-      ConnectionStrings__Redis: redis:6379
-
-      Jwt__Key: THIS_IS_A_VERY_LONG_SUPER_SECRET_KEY_FOR_JWT_AUTH_TICKETS_API_GENERAL_2026
-      Jwt__Issuer: TicketsAPI
-      Jwt__Audience: TicketsUsers
-
-      Minio__Endpoint: minio:9000
-      Minio__AccessKey: minioadmin
-      Minio__SecretKey: minioadmin
-
-  mysql:
-    image: mysql:8.0
-
-    container_name: tickets-api-general-mysql
-
-    restart: always
-
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: tickets_api_general
-
-    ports:
-      - "3306:3306"
-
-    volumes:
-      - mysql_data:/var/lib/mysql
-
-  redis:
-    image: redis:latest
-
-    container_name: tickets-api-general-redis
-
-    command: redis-server --appendonly yes
-
-    ports:
-      - "6379:6379"
-
-    volumes:
-      - redis_data:/data
-
   minio:
-    image: quay.io/minio/minio
+    image: minio/minio
 
-    container_name: tickets-api-general-minio
+    container_name: events-minio
+
+    restart: unless-stopped
 
     command: server /data --console-address ":9001"
-
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
 
     ports:
       - "9000:9000"
       - "9001:9001"
 
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+
     volumes:
       - minio_data:/data
 
+    networks:
+      - tickets-network
+
 volumes:
-  mysql_data:
-  redis_data:
   minio_data:
+
+networks:
+  tickets-network:
+    external: true
