@@ -50,7 +50,7 @@ jobs:
 
           script: |
 
-            cd /home/ismael/events/api
+            cd /Ismael/spring-8/tickets/api
 
             echo "Pull latest image"
             docker pull ${{ secrets.DOCKER_USER }}/events-api:latest
