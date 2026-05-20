@@ -142,6 +142,84 @@ ApiGeneral/
 
 ---
 
+# Start Project
+
+## Add `appsettings.json`
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "server=localhost;port=3306;database=tickets_api_general;user=root;password=YOUR_PASSWORD",
+    "Redis": "localhost:6379"
+  },
+
+  "Jwt": {
+    "Key": "THIS_IS_A_VERY_LONG_SUPER_SECRET_KEY_FOR_JWT_AUTH_TICKETS_API_GENERAL_2026",
+    "Issuer": "TicketsAPI",
+    "Audience": "TicketsUsers",
+    "ExpireMinutes": 15,
+    "RefreshExpireDays": 7
+  },
+
+  "Minio": {
+    "Endpoint": "localhost:9000",
+    "AccessKey": "minioadmin",
+    "SecretKey": "minioadmin",
+    "Bucket": "user-photos"
+  },
+
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+
+  "AllowedHosts": "*"
+}
+```
+
+or ``In Terminal``
+```bash
+cp appsettings.example.json appsettings.json
+```
+
+# Execute
+
+---
+
+## Entity Framework Migrations
+
+Create migrations:
+
+```bash
+dotnet ef migrations add InitialCreate
+```
+
+Apply migrations:
+
+```bash
+dotnet ef database update
+```
+
+# Run the API
+
+```bash
+dotnet run
+```
+
+## If you have the same DB (like the project has) only execute
+
+```bash
+dotnet build
+```
+
+```bash
+dotnet run
+```
+
+---
+
 # Default Roles
 
 | Role | Email | Password |
@@ -270,67 +348,6 @@ Make the bucket public:
 docker exec -it tickets-api-general-minio mc alias set local http://localhost:9000 minioadmin minioadmin
 
 docker exec -it tickets-api-general-minio mc anonymous set public local/user-photos
-```
-
----
-
-# appsettings.json
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "server=localhost;port=3306;database=tickets_api_general;user=root;password=YOUR_PASSWORD",
-    "Redis": "localhost:6379"
-  },
-
-  "Jwt": {
-    "Key": "THIS_IS_A_VERY_LONG_SUPER_SECRET_KEY_FOR_JWT_AUTH_TICKETS_API_GENERAL_2026",
-    "Issuer": "TicketsAPI",
-    "Audience": "TicketsUsers",
-    "ExpireMinutes": 15,
-    "RefreshExpireDays": 7
-  },
-
-  "Minio": {
-    "Endpoint": "localhost:9000",
-    "AccessKey": "minioadmin",
-    "SecretKey": "minioadmin",
-    "Bucket": "user-photos"
-  },
-
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  },
-
-  "AllowedHosts": "*"
-}
-```
-
----
-
-# Entity Framework Migrations
-
-Create migrations:
-
-```bash
-dotnet ef migrations add InitialCreate
-```
-
-Apply migrations:
-
-```bash
-dotnet ef database update
-```
-
----
-
-# Run the API
-
-```bash
-dotnet run
 ```
 
 ---
