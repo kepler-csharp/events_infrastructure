@@ -5,6 +5,7 @@ using ApiGeneral.AuthApi.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using System.Text.Json;
+using ApiGeneral.AuthApi.Entities.Enums;
 
 namespace ApiGeneral.AuthApi.Services;
 
