@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Minio;
 using Minio.DataModel.Args;
+using Org.BouncyCastle.Math.EC;
 using StackExchange.Redis;
 
 namespace ApiGeneral.AuthApi.Services;
@@ -17,18 +18,21 @@ public class AuthControllerService : IAuthControllerService
     private readonly JwtService _jwtService;
     private readonly IConnectionMultiplexer _redis;
     private readonly IMinioClient _minio;
+    private readonly IConfiguration _configuration;
 
     public AuthControllerService(
         UserManager<ApplicationUser> userManager,
         JwtService jwtService,
         IConnectionMultiplexer redis,
-        IMinioClient minio
+        IMinioClient minio,
+        IConfiguration configuration
     )
     {
         _userManager = userManager;
         _jwtService = jwtService;
         _redis = redis;
         _minio = minio;
+        _configuration = configuration;
     }
 
     public async Task<IActionResult> Login(LoginDto dto)
@@ -204,8 +208,9 @@ public class AuthControllerService : IAuthControllerService
                 .WithContentType(file.ContentType)
         );
 
+        String? url = _configuration["Minio:Endpoint"];
         var photoUrl =
-            $"http://localhost:9000/{bucketName}/{fileName}";
+            $"http://{url}/{bucketName}/{fileName}";
 
         var userId =
             principal.FindFirstValue(
