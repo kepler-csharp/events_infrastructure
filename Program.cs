@@ -1,6 +1,7 @@
 using System.Text;
 using ApiGeneral.AuthApi.Data;
 using ApiGeneral.AuthApi.Entities;
+using ApiGeneral.AuthApi.Seed;
 using ApiGeneral.AuthApi.Services;
 using ApiGeneral.AuthApi.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -22,6 +23,7 @@ builder.Services.AddScoped<JwtService>();
 
 builder.Services.AddScoped<IAuthControllerService, AuthControllerService>();
 
+
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseMySql(
@@ -31,6 +33,15 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         )
     );
 });
+
+// Domain services
+builder.Services.AddScoped<IVenueService,    VenueService>();
+builder.Services.AddScoped<IEventService,    EventService>();
+builder.Services.AddScoped<IShowtimeService, ShowtimeService>();
+builder.Services.AddScoped<ISeatService,     SeatService>();
+builder.Services.AddScoped<IOrderService,    OrderService>();
+builder.Services.AddScoped<IScannerService,  ScannerService>();
+builder.Services.AddScoped<IAdminService,    AdminService>();
 
 builder.Services
     .AddIdentity<ApplicationUser, IdentityRole>(options =>
