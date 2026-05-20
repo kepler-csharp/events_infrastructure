@@ -1,0 +1,63 @@
+name: CI/CD Deploy VPS
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches: [ "main", "Develop" ]
+
+jobs:
+  build-and-deploy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # Checkout
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Login DockerHub
+      - name: DockerHub Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # Build image
+      - name: Build Docker Image
+        run: |
+          docker build \
+            -f Infrastructure/Api/Dockerfile \
+            -t ${{ secrets.DOCKER_USER }}/events-api:latest \
+            .
+
+      # Push image
+      - name: Push Docker Image
+        run: |
+          docker push ${{ secrets.DOCKER_USER }}/events-api:latest
+
+      # Deploy VPS
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.2.0
+
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: 22
+
+          script: |
+
+            cd /Ismael/spring-8/tickets/api
+
+            echo "Pull latest image"
+            docker pull ${{ secrets.DOCKER_USER }}/events-api:latest
+
+            echo "Restart API"
+            docker compose down
+            docker compose up -d
+
+            echo "Remove dangling images"
+            docker image prune -f
