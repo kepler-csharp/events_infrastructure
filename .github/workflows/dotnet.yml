@@ -12,18 +12,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Login DockerHub
       - name: DockerHub Login
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Build image
       - name: Build Docker Image
         run: |
           docker build \
@@ -31,12 +28,22 @@ jobs:
             -t ${{ secrets.DOCKER_USER }}/events-api:latest \
             .
 
-      # Push image
       - name: Push Docker Image
         run: |
           docker push ${{ secrets.DOCKER_USER }}/events-api:latest
 
-      # Deploy VPS
+      # Copia el docker-compose.prod.yml a la VPS
+      - name: Copiar docker-compose.prod.yml a la VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: 22
+          source: "docker-compose.prod.yml"
+          target: "/Ismael/spring-8/tickets/api"
+
+      # Deploy usando el compose de producción, variables inyectadas inline
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -46,10 +53,25 @@ jobs:
           port: 22
           script: |
             cd /Ismael/spring-8/tickets/api
-            echo "Pull latest image"
+
+            echo "── Pull latest image ──"
             docker pull ${{ secrets.DOCKER_USER }}/events-api:latest
-            echo "Restart API"
-            docker compose down
-            docker compose up -d
-            echo "Remove dangling images"
+
+            echo "── Restart servicios ──"
+            docker compose -f docker-compose.prod.yml down
+
+            DOCKER_USER=${{ secrets.DOCKER_USER }} \
+            MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }} \
+            MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }} \
+            MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }} \
+            JWT_KEY=${{ secrets.JWT_KEY }} \
+            docker compose -f docker-compose.prod.yml up -d
+
+            echo "── Verificar estado ──"
+            sleep 5
+            docker compose -f docker-compose.prod.yml ps
+
+            echo "── Remove dangling images ──"
             docker image prune -f
+
+            echo "✅ Deploy completado"
