@@ -15,12 +15,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ─────────────────────────────────────────
+      # 1. Login en DockerHub
+      # ─────────────────────────────────────────
       - name: DockerHub Login
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      # ─────────────────────────────────────────
+      # 2. Build con docker-compose.yml (build context local)
+      #    y tag de la imagen para DockerHub
+      # ─────────────────────────────────────────
       - name: Build Docker Image
         run: |
           docker build \
@@ -28,11 +35,16 @@ jobs:
             -t ${{ secrets.DOCKER_USER }}/events-api:latest \
             .
 
+      # ─────────────────────────────────────────
+      # 3. Push de la imagen a DockerHub
+      # ─────────────────────────────────────────
       - name: Push Docker Image
         run: |
           docker push ${{ secrets.DOCKER_USER }}/events-api:latest
 
-      # Copia el docker-compose.prod.yml a la VPS
+      # ─────────────────────────────────────────
+      # 4. Copiar docker-compose.prod.yml a la VPS
+      # ─────────────────────────────────────────
       - name: Copiar docker-compose.prod.yml a la VPS
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -43,7 +55,13 @@ jobs:
           source: "docker-compose.prod.yml"
           target: "/Ismael/spring-8/tickets/api"
 
-      # Deploy usando el compose de producción, variables inyectadas inline
+      # ─────────────────────────────────────────
+      # 5. Escribir .env y levantar contenedores en la VPS
+      #
+      #    Se escribe el .env antes del compose up para que
+      #    Docker Compose lo lea automáticamente (sin necesidad
+      #    de pasar variables inline, que es lo que fallaba antes).
+      # ─────────────────────────────────────────
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -52,23 +70,29 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           port: 22
           script: |
+            set -e
             cd /Ismael/spring-8/tickets/api
+
+            echo "── Escribir .env ──"
+            cat > .env << EOF
+            DOCKER_USER=${{ secrets.DOCKER_USER }}
+            MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+            MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }}
+            MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}
+            JWT_KEY=${{ secrets.JWT_KEY }}
+            EOF
 
             echo "── Pull latest image ──"
             docker pull ${{ secrets.DOCKER_USER }}/events-api:latest
 
-            echo "── Restart servicios ──"
-            docker compose -f docker-compose.prod.yml down
+            echo "── Bajar stack anterior ──"
+            docker compose -f docker-compose.prod.yml down --remove-orphans
 
-            DOCKER_USER=${{ secrets.DOCKER_USER }} \
-            MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }} \
-            MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }} \
-            MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }} \
-            JWT_KEY=${{ secrets.JWT_KEY }} \
+            echo "── Levantar stack ──"
             docker compose -f docker-compose.prod.yml up -d
 
-            echo "── Verificar estado ──"
-            sleep 5
+            echo "── Verificar estado (esperar healthchecks) ──"
+            sleep 15
             docker compose -f docker-compose.prod.yml ps
 
             echo "── Remove dangling images ──"
