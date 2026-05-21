@@ -43,7 +43,6 @@ jobs:
           source: "docker-compose.prod.yml"
           target: "/Ismael/spring-8/tickets/api"
 
-      # Deploy usando el compose de producción, variables inyectadas inline
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -57,21 +56,24 @@ jobs:
             echo "── Pull latest image ──"
             docker pull ${{ secrets.DOCKER_USER }}/events-api:latest
 
-            echo "── Restart servicios ──"
+            echo "── Bajar servicios anteriores ──"
             docker compose -f docker-compose.prod.yml down
 
+            echo "── Levantar servicios con variables ──"
             DOCKER_USER=${{ secrets.DOCKER_USER }} \
             MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }} \
             MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }} \
             MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }} \
             JWT_KEY=${{ secrets.JWT_KEY }} \
+            EMAIL_USERNAME=${{ secrets.EMAIL_USERNAME }} \
+            EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }} \
             docker compose -f docker-compose.prod.yml up -d
 
-            echo "── Verificar estado ──"
-            sleep 5
+            echo "── Esperar arranque ──"
+            sleep 8
             docker compose -f docker-compose.prod.yml ps
 
-            echo "── Remove dangling images ──"
+            echo "── Limpiar imágenes huérfanas ──"
             docker image prune -f
 
             echo "✅ Deploy completado"
