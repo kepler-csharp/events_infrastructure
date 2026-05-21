@@ -20,7 +20,7 @@ WORKDIR /app
 COPY --from=build /out .
 
 # Exponer puerto
-EXPOSE 8080
+EXPOSE 8081
 
 # Comando de inicio
 ENTRYPOINT ["dotnet", "ApiGeneral.dll"]
