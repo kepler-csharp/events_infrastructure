@@ -109,8 +109,8 @@ services:
       Jwt__Key: ${JWT_KEY:-THIS_IS_A_VERY_LONG_SUPER_SECRET_KEY_FOR_JWT_AUTH_TICKETS_API_GENERAL_2026}
       Jwt__Issuer: TicketsAPI
       Jwt__Audience: TicketsUsers
-      Jwt__ExpireMinutes: "15"
-      Jwt__RefreshExpireDays: "7"
+      Jwt__ExpireMinutes: "60"
+      Jwt__RefreshExpireDays: "1"
       # MinIO
       Minio__Endpoint: "minio:9000"
       Minio__AccessKey: ${MINIO_ROOT_USER:-minioadmin}
