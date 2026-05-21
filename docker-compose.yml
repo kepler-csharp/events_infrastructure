@@ -1,0 +1,142 @@
+services:
+
+  # ─────────────────────────────────────────
+  # MySQL 8
+  # ─────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: tickets-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: tickets_api_general
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - tickets-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ─────────────────────────────────────────
+  # Redis
+  # ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: tickets-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - tickets-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # MinIO
+  # ─────────────────────────────────────────
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: tickets-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9002:9000"   # API S3
+      - "9003:9001"   # Consola web
+    volumes:
+      - minio_data:/data
+    networks:
+      - tickets-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ─────────────────────────────────────────
+  # Inicializar bucket público en MinIO
+  # Se ejecuta una sola vez después de MinIO
+  # ─────────────────────────────────────────
+  minio-init:
+    image: quay.io/minio/minio:latest
+    container_name: tickets-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin} &&
+        mc mb --ignore-existing local/user-photos &&
+        mc anonymous set public local/user-photos &&
+        echo 'Bucket user-photos creado y configurado como público.'
+      "
+    networks:
+      - tickets-net
+    restart: on-failure
+
+  # ─────────────────────────────────────────
+  # API — ASP.NET Core 10
+  # ─────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tickets-api
+    restart: unless-stopped
+    ports:
+      - "5201:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # Connection Strings
+      ConnectionStrings__DefaultConnection: "server=mysql;port=3306;database=tickets_api_general;user=root;password=${MYSQL_ROOT_PASSWORD:-rootpassword}"
+      ConnectionStrings__Redis: "redis:6379"
+      # JWT
+      Jwt__Key: ${JWT_KEY:-THIS_IS_A_VERY_LONG_SUPER_SECRET_KEY_FOR_JWT_AUTH_TICKETS_API_GENERAL_2026}
+      Jwt__Issuer: TicketsAPI
+      Jwt__Audience: TicketsUsers
+      Jwt__ExpireMinutes: "15"
+      Jwt__RefreshExpireDays: "7"
+      # MinIO
+      Minio__Endpoint: "minio:9000"
+      Minio__AccessKey: ${MINIO_ROOT_USER:-minioadmin}
+      Minio__SecretKey: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      Minio__Bucket: user-photos
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - tickets-net
+
+# ─────────────────────────────────────────
+# Volúmenes persistentes
+# ─────────────────────────────────────────
+volumes:
+  mysql_data:
+  redis_data:
+  minio_data:
+
+# ─────────────────────────────────────────
+# Red interna
+# ─────────────────────────────────────────
+networks:
+  tickets-net:
+    driver: bridge

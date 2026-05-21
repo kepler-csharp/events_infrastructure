@@ -9,11 +9,9 @@ on:
 
 jobs:
   build-and-deploy:
-
     runs-on: ubuntu-latest
 
     steps:
-
       # Checkout
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,7 +27,7 @@ jobs:
       - name: Build Docker Image
         run: |
           docker build \
-            -f Infrastructure/Api/Dockerfile \
+            -f Dockerfile \
             -t ${{ secrets.DOCKER_USER }}/events-api:latest \
             .
 
@@ -41,23 +39,17 @@ jobs:
       # Deploy VPS
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.2.0
-
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           port: 22
-
           script: |
-
             cd /Ismael/spring-8/tickets/api
-
             echo "Pull latest image"
             docker pull ${{ secrets.DOCKER_USER }}/events-api:latest
-
             echo "Restart API"
             docker compose down
             docker compose up -d
-
             echo "Remove dangling images"
             docker image prune -f
