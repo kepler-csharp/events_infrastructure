@@ -5,7 +5,7 @@ services:
   # ─────────────────────────────────────────
   mysql:
     image: mysql:8.0
-    container_name: tickets-mysql
+    container_name: api-mysql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
@@ -29,7 +29,7 @@ services:
   # ─────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: tickets-redis
+    container_name: api-redis
     restart: unless-stopped
     command: redis-server --appendonly yes
     ports:
@@ -49,7 +49,7 @@ services:
   # ─────────────────────────────────────────
   minio:
     image: quay.io/minio/minio:latest
-    container_name: tickets-minio
+    container_name: api-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -74,7 +74,7 @@ services:
   # ─────────────────────────────────────────
   minio-init:
     image: quay.io/minio/minio:latest
-    container_name: tickets-minio-init
+    container_name: api-minio-init
     depends_on:
       minio:
         condition: service_healthy
@@ -94,7 +94,7 @@ services:
   # ─────────────────────────────────────────
   api:
     image: ${DOCKER_USER}/events-api:latest
-    container_name: tickets-api
+    container_name: api-tickets
     restart: unless-stopped
     ports:
       - "5201:8080"
