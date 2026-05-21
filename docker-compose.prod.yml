@@ -17,7 +17,8 @@ services:
     networks:
       - tickets-net
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      # Sin -p para que no falle cuando el password tiene caracteres especiales
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "--password=${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -89,7 +90,7 @@ services:
     restart: on-failure
 
   # ─────────────────────────────────────────
-  # API — IMAGEN DOCKERHUB (producción)
+  # API — imagen de DockerHub (producción)
   # ─────────────────────────────────────────
   api:
     image: ${DOCKER_USER}/events-api:latest
@@ -99,25 +100,17 @@ services:
       - "5201:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      # Base de datos
       ConnectionStrings__DefaultConnection: "server=mysql;port=3306;database=tickets_api_general;user=root;password=${MYSQL_ROOT_PASSWORD}"
       ConnectionStrings__Redis: "redis:6379"
-      # JWT
       Jwt__Key: ${JWT_KEY}
       Jwt__Issuer: TicketsAPI
       Jwt__Audience: TicketsUsers
       Jwt__ExpireMinutes: "60"
       Jwt__RefreshExpireDays: "1"
-      # MinIO
       Minio__Endpoint: "minio:9000"
       Minio__AccessKey: ${MINIO_ROOT_USER}
       Minio__SecretKey: ${MINIO_ROOT_PASSWORD}
       Minio__Bucket: user-photos
-      # Email
-      Email__Host: smtp.gmail.com
-      Email__Port: "587"
-      Email__Username: ${EMAIL_USERNAME}
-      Email__Password: ${EMAIL_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
