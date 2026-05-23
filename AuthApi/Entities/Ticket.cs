@@ -10,6 +10,9 @@ public class Ticket
 
     [MaxLength(500)] public string QRCode { get; set; } = string.Empty;
 
+    /// <summary>URL pública en MinIO de la imagen PNG del QR.</summary>
+    [MaxLength(1000)] public string? QrImageUrl { get; set; }
+
     public bool      IsUsed    { get; set; } = false;
     public DateTime? UsedAt    { get; set; }
     public DateTime  CreatedAt { get; set; } = DateTime.UtcNow;

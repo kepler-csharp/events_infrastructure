@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using ApiGeneral.AuthApi.DTOs;
+using ApiGeneral.AuthApi.DTOs.AuthDTOs;
 using ApiGeneral.AuthApi.Entities;
 using ApiGeneral.AuthApi.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
@@ -19,13 +20,15 @@ public class AuthControllerService : IAuthControllerService
     private readonly IConnectionMultiplexer _redis;
     private readonly IMinioClient _minio;
     private readonly IConfiguration _configuration;
+    private readonly IEmailService _email;
 
     public AuthControllerService(
         UserManager<ApplicationUser> userManager,
         JwtService jwtService,
         IConnectionMultiplexer redis,
         IMinioClient minio,
-        IConfiguration configuration
+        IConfiguration configuration,
+        IEmailService email
     )
     {
         _userManager = userManager;
@@ -33,6 +36,7 @@ public class AuthControllerService : IAuthControllerService
         _redis = redis;
         _minio = minio;
         _configuration = configuration;
+        _email = email;
     }
 
     public async Task<IActionResult> Login(LoginDto dto)
@@ -121,6 +125,58 @@ public class AuthControllerService : IAuthControllerService
     {
         return await RegisterUser(dto, "Receptionist");
     }
+    
+    // ── Profile ───────────────────────────────────────────────────────────────
+
+    public async Task<IActionResult> GetProfile(ClaimsPrincipal principal)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+            return new UnauthorizedResult();
+
+        var user = await _userManager.FindByIdAsync(userId);
+
+        if (user == null)
+            return new NotFoundObjectResult("User not found");
+
+        return new OkObjectResult(new UserProfileDto
+        {
+            FullName = user.FullName ?? string.Empty,
+            Email    = user.Email    ?? string.Empty,
+            PhotoUrl = user.PhotoUrl
+        });
+    }
+    
+    // ── Change Password ───────────────────────────────────────────────────────
+
+    public async Task<IActionResult> ChangePassword(
+        ClaimsPrincipal principal,
+        ChangePasswordDto dto
+    )
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userId))
+            return new UnauthorizedResult();
+
+        var user = await _userManager.FindByIdAsync(userId);
+
+        if (user == null)
+            return new NotFoundObjectResult("User not found");
+
+        var result = await _userManager.ChangePasswordAsync(
+            user,
+            dto.CurrentPassword,
+            dto.NewPassword
+        );
+
+        if (!result.Succeeded)
+            return new BadRequestObjectResult(result.Errors);
+
+        return new OkObjectResult(new { message = "Password changed successfully" });
+    }
+    
 
     private async Task<IActionResult> RegisterUser(
         RegisterDto dto,
@@ -159,11 +215,29 @@ public class AuthControllerService : IAuthControllerService
 
         await _userManager.AddToRoleAsync(user, role);
 
+        // Send welcome email (fire and forget)
+        _ = SendWelcomeEmailAsync(user);
+
         return new OkObjectResult(new
         {
             message =
                 $"{role} registered successfully"
         });
+    }
+    
+    private async Task SendWelcomeEmailAsync(ApplicationUser user)
+    {
+        try
+        {
+            await _email.SendWelcomeEmailAsync(
+                user.Email!,
+                user.FullName ?? user.Email!
+            );
+        }
+        catch
+        {
+            // Silently ignore — no bloquear el registro
+        }
     }
 
     public async Task<IActionResult> UploadPhoto(

@@ -86,4 +86,15 @@ public class AuthController : ControllerBase
             file
         );
     }
+    
+    [Authorize]
+    [HttpGet("me")]
+    public async Task<IActionResult> GetProfile()
+        => await _service.GetProfile(User);
+
+    /// <summary>Cambia la contraseña del usuario autenticado.</summary>
+    [Authorize]
+    [HttpPut("change-password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+        => await _service.ChangePassword(User, dto);
 }

@@ -22,4 +22,12 @@ public interface IAuthControllerService
         ClaimsPrincipal principal,
         IFormFile file
     );
+    
+    Task<IActionResult> GetProfile(ClaimsPrincipal principal);
+
+    /// <summary>Cambia la contraseña del usuario autenticado.</summary>
+    Task<IActionResult> ChangePassword(
+        ClaimsPrincipal principal,
+        ChangePasswordDto dto
+    );
 }

@@ -23,6 +23,9 @@ builder.Services.AddScoped<JwtService>();
 
 builder.Services.AddScoped<IAuthControllerService, AuthControllerService>();
 
+// ── Email & QR ────────────────────────────────────────────────────────────────
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IQrService,    QrService>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
@@ -220,7 +223,13 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// seedeer
+// seedeer develop
+// using (var scope = app.Services.CreateScope())
+// {
+//     await SeedData.Initialize(scope.ServiceProvider);
+// }
+
+// seedeer deploy
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;

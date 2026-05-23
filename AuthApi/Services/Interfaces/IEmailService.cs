@@ -1,0 +1,30 @@
+namespace ApiGeneral.AuthApi.Services.Interfaces;
+
+public interface IEmailService
+{
+    Task SendTicketEmailAsync(
+        string toEmail,
+        string toName,
+        TicketEmailData data
+    );
+
+    Task SendWelcomeEmailAsync(
+        string toEmail,
+        string toName
+    );
+}
+
+public class TicketEmailData
+{
+    public int      TicketId      { get; set; }
+    public string   EventName     { get; set; } = string.Empty;
+    public string   VenueName     { get; set; } = string.Empty;
+    public string   VenueAddress  { get; set; } = string.Empty;
+    public string   VenueCity     { get; set; } = string.Empty;
+    public DateTime ShowtimeStart { get; set; }
+    public string   SeatLabel     { get; set; } = string.Empty;
+    public decimal  PricePaid     { get; set; }
+    public string   TransactionId { get; set; } = string.Empty;
+    public string   QrCodeBase64  { get; set; } = string.Empty; // PNG en base64 para adjuntar inline
+    public string?  QrImageUrl    { get; set; }                  // URL pública en MinIO
+}
