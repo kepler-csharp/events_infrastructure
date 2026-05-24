@@ -82,7 +82,7 @@ jobs:
             JWT_KEY=${{ secrets.JWT_KEY }}
             HOST=${{ secrets.VPS_HOST }}
             SMTP_HOST=smtp.gmail.com
-            SMTP_PORT==${{ secrets.SMTP_PORT }}
+            SMTP_PORT=${{ secrets.SMTP_PORT }}
             SMTP_USERNAME=${{ secrets.SMTP_USERNAME }}
             SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}
             SMTP_ADDRESS=${{ secrets.SMTP_USERNAME }}
