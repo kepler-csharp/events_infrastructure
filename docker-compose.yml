@@ -83,6 +83,9 @@ services:
         mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin} &&
         mc mb --ignore-existing local/user-photos &&
         mc anonymous set public local/user-photos &&
+      
+        mc mb --ignore-existing local/ticket-qrcodes &&
+        mc anonymous set public local/ticket-qrcodes &&
         echo 'Bucket user-photos creado y configurado como público.'
       "
     networks:
@@ -105,6 +108,7 @@ services:
       # Connection Strings
       ConnectionStrings__DefaultConnection: "server=mysql;port=3306;database=tickets_api_general;user=root;password=${MYSQL_ROOT_PASSWORD:-rootpassword}"
       ConnectionStrings__Redis: "redis:6379"
+      ConnectionStrings__RedisOut: "${HOST}:6380"
       # JWT
       Jwt__Key: ${JWT_KEY:-THIS_IS_A_VERY_LONG_SUPER_SECRET_KEY_FOR_JWT_AUTH_TICKETS_API_GENERAL_2026}
       Jwt__Issuer: TicketsAPI
@@ -113,9 +117,19 @@ services:
       Jwt__RefreshExpireDays: "1"
       # MinIO
       Minio__Endpoint: "minio:9000"
+      Minio__EndpointOut: "${HOST}:9002"
       Minio__AccessKey: ${MINIO_ROOT_USER:-minioadmin}
       Minio__SecretKey: ${MINIO_ROOT_PASSWORD:-minioadmin}
       Minio__Bucket: user-photos
+      # SMTP
+      Email__Host: ${SMTP_HOST}
+      Email__Port: ${SMTP_PORT}
+      Email__Username: ${SMTP_USERNAME}
+      Email__Password: ${SMTP_PASSWORD}
+      Email__FromAddress: ${SMTP_ADDRESS}
+      Email__FromName: ${SMTP_APP_NAME}
+      Email__EnableSsl: ${SMTP_ENABLESSL}
+      
     depends_on:
       mysql:
         condition: service_healthy

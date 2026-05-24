@@ -8,4 +8,6 @@ public class OrderItemDto
     public DateTime ShowtimeStart { get; set; }
     public decimal PricePaid      { get; set; }
     public string? QRCode         { get; set; }
+    
+    public string? QrImageUrl      { get; set; }
 }
