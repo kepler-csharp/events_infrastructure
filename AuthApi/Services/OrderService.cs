@@ -253,7 +253,7 @@ public class OrderService : IOrderService
                     .WithContentType("image/png")
             );
 
-            var endpoint = _config["Minio:Endpoint"];
+            var endpoint = _config["Minio:EndpointOut"];
             return $"http://{endpoint}/{QrBucket}/{fileName}";
         }
         catch

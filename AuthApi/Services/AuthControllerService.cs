@@ -282,7 +282,7 @@ public class AuthControllerService : IAuthControllerService
                 .WithContentType(file.ContentType)
         );
 
-        String? url = _configuration["Minio:Endpoint"];
+        String? url = _configuration["Minio:EndpointOut"];
         var photoUrl =
             $"http://{url}/{bucketName}/{fileName}";
 

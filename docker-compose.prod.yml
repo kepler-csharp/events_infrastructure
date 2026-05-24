@@ -83,6 +83,9 @@ services:
         mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
         mc mb --ignore-existing local/user-photos &&
         mc anonymous set public local/user-photos &&
+      
+        mc mb --ignore-existing local/ticket-qrcodes &&
+        mc anonymous set public local/ticket-qrcodes &&
         echo 'Bucket user-photos creado y configurado como público.'
       "
     networks:
@@ -102,12 +105,14 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__DefaultConnection: "server=mysql;port=3306;database=tickets_api_general;user=root;password=${MYSQL_ROOT_PASSWORD}"
       ConnectionStrings__Redis: "redis:6379"
+      ConnectionStrings__RedisOut: "${HOST}:6380"
       Jwt__Key: ${JWT_KEY}
       Jwt__Issuer: TicketsAPI
       Jwt__Audience: TicketsUsers
       Jwt__ExpireMinutes: "60"
       Jwt__RefreshExpireDays: "1"
       Minio__Endpoint: "minio:9000"
+      Minio__EndpointOut: "${HOST}:9002
       Minio__AccessKey: ${MINIO_ROOT_USER}
       Minio__SecretKey: ${MINIO_ROOT_PASSWORD}
       Minio__Bucket: user-photos
