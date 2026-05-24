@@ -115,7 +115,7 @@ services:
       Jwt__RefreshExpireDays: "1"
       # MinIO
       Minio__Endpoint: "minio:9000"
-      Minio__EndpointOut: "${HOST}:9002
+      Minio__EndpointOut: "${HOST}:9002"
       Minio__AccessKey: ${MINIO_ROOT_USER}
       Minio__SecretKey: ${MINIO_ROOT_PASSWORD}
       Minio__Bucket: user-photos
