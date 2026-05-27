@@ -81,6 +81,7 @@ jobs:
             MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}
             JWT_KEY=${{ secrets.JWT_KEY }}
             HOST=${{ secrets.VPS_HOST }}
+            HOST_DNS=${{ secrets.HOST_DNS }}
             SMTP_HOST=smtp.gmail.com
             SMTP_PORT=${{ secrets.SMTP_PORT }}
             SMTP_USERNAME=${{ secrets.SMTP_USERNAME }}
