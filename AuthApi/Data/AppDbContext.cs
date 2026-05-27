@@ -17,7 +17,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Payment>          Payments          => Set<Payment>();
     public DbSet<Ticket>           Tickets           => Set<Ticket>();
     public DbSet<TicketValidation> TicketValidations => Set<TicketValidation>();
-
+    public DbSet<AuditLog>         AuditLogs         => Set<AuditLog>();
+    public DbSet<RefundRequest>    RefundRequests     => Set<RefundRequest>();
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -110,6 +111,24 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
             e.HasOne(x => x.Ticket)
              .WithMany(x => x.Validations)
              .HasForeignKey(x => x.TicketId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── AuditLog ───────────────────────────────────────────────────────
+        builder.Entity<AuditLog>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Action).HasMaxLength(100).IsRequired();
+            e.Property(x => x.EntityType).HasMaxLength(100).IsRequired();
+        });
+
+        // ── RefundRequest ──────────────────────────────────────────────────
+        builder.Entity<RefundRequest>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasOne(x => x.Order)
+             .WithMany(x => x.RefundRequests)
+             .HasForeignKey(x => x.OrderId)
              .OnDelete(DeleteBehavior.Cascade);
         });
     }

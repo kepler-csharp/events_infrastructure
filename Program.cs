@@ -45,6 +45,7 @@ builder.Services.AddScoped<ISeatService,     SeatService>();
 builder.Services.AddScoped<IOrderService,    OrderService>();
 builder.Services.AddScoped<IScannerService,  ScannerService>();
 builder.Services.AddScoped<IAdminService,    AdminService>();
+builder.Services.AddScoped<IReceptionistService, ReceptionistService>();
 
 builder.Services
     .AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -224,18 +225,18 @@ app.UseAuthorization();
 app.MapControllers();
 
 // seedeer develop
-// using (var scope = app.Services.CreateScope())
-// {
-//     await SeedData.Initialize(scope.ServiceProvider);
-// }
-
-// seedeer deploy
 using (var scope = app.Services.CreateScope())
 {
-    var services = scope.ServiceProvider;
-
-    await SeedData.Initialize(services);
+    await SeedData.Initialize(scope.ServiceProvider);
 }
+
+// seedeer deploy
+// using (var scope = app.Services.CreateScope())
+// {
+//     var services = scope.ServiceProvider;
+//
+//     await SeedData.Initialize(services);
+// }
 
 app.Run();
 

@@ -67,7 +67,7 @@ public class AuthControllerService : IAuthControllerService
             await _jwtService.GenerateAccessToken(user);
 
         var refreshToken =
-            _jwtService.GenerateRefreshToken(user.Id);
+            await _jwtService.GenerateRefreshToken(user.Id);
 
         return new OkObjectResult(new
         {
@@ -321,6 +321,72 @@ public class AuthControllerService : IAuthControllerService
         return new OkObjectResult(new
         {
             photoUrl = user.PhotoUrl
+        });
+    }
+    
+    // ── Forgot Password ───────────────────────────────────────────────────────
+
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest req)
+    {
+        var user = await _userManager.FindByEmailAsync(req.Email);
+
+        // Siempre devolvemos 200 para no filtrar qué emails existen
+        if (user == null)
+            return new OkObjectResult(new { message = "If that email exists, a reset link has been sent." });
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+        _ = _email.SendForgotPasswordEmailAsync(
+            user.Email!,
+            user.FullName ?? user.Email!,
+            token
+        );
+
+        return new OkObjectResult(new { message = "If that email exists, a reset link has been sent." });
+    }
+
+    // ── Reset Password ────────────────────────────────────────────────────────
+
+    public async Task<IActionResult> ResetPassword(ResetPasswordRequest req)
+    {
+        var user = await _userManager.FindByEmailAsync(req.Email);
+        if (user == null)
+            return new BadRequestObjectResult("Invalid request.");
+
+        var result = await _userManager.ResetPasswordAsync(user, req.Token, req.NewPassword);
+
+        if (!result.Succeeded)
+            return new BadRequestObjectResult(result.Errors);
+
+        return new OkObjectResult(new { message = "Password reset successfully. You can now log in." });
+    }
+
+    // ── Refresh Token ─────────────────────────────────────────────────────────
+
+    public async Task<IActionResult> RefreshToken(RefreshTokenDto dto)
+    {
+        var db = _redis.GetDatabase();
+        var key = $"refresh:{dto.RefreshToken}";
+
+        var userId = await db.StringGetAsync(key);
+
+        if (!userId.HasValue)
+            return new UnauthorizedObjectResult(new { message = "Refresh token inválido o expirado." });
+
+        var user = await _userManager.FindByIdAsync(userId!);
+        if (user == null || !user.IsActive)
+            return new UnauthorizedObjectResult(new { message = "Usuario no encontrado o inactivo." });
+
+        // Rotate: delete old refresh token, issue new pair
+        await db.KeyDeleteAsync(key);
+
+        var newAccessToken  = await _jwtService.GenerateAccessToken(user);
+        var newRefreshToken = await _jwtService.GenerateRefreshToken(user.Id);
+
+        return new OkObjectResult(new
+        {
+            accessToken  = newAccessToken,
+            refreshToken = newRefreshToken
         });
     }
 }

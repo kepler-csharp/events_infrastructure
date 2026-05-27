@@ -1,6 +1,7 @@
 using ApiGeneral.AuthApi.Data;
 using ApiGeneral.AuthApi.DTOs.OrderDTOs;
 using ApiGeneral.AuthApi.DTOs.Shared;
+using ApiGeneral.AuthApi.DTOs.TicketDTOs;
 using ApiGeneral.AuthApi.Entities;
 using ApiGeneral.AuthApi.Entities.Enums;
 using ApiGeneral.AuthApi.Services.Interfaces;
@@ -195,6 +196,69 @@ public class OrderService : IOrderService
     {
         var exists = await _db.Orders.AnyAsync(o => o.Id == id && o.UserId == userId);
         return exists ? await BuildOrderDtoAsync(id, userId) : null;
+    }
+
+    public async Task<List<OrderTicketDto>?> GetOrderTicketsAsync(int orderId, string userId)
+    {
+        var order = await _db.Orders
+            .Include(o => o.Items)
+                .ThenInclude(i => i.Ticket)
+            .Include(o => o.Items)
+                .ThenInclude(i => i.Seat)
+                    .ThenInclude(s => s.Showtime)
+                        .ThenInclude(st => st.Event)
+            .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
+
+        if (order == null) return null;
+
+        return order.Items
+            .Where(i => i.Ticket != null)
+            .Select(i => new OrderTicketDto
+            {
+                TicketId      = i.Ticket!.Id,
+                QRCode        = i.Ticket.QRCode,
+                QrImageUrl    = i.Ticket.QrImageUrl,
+                SeatLabel     = i.Seat.Label,
+                EventName     = i.Seat.Showtime.Event.Name,
+                ShowtimeStart = i.Seat.Showtime.StartTime,
+                IsUsed        = i.Ticket.IsUsed,
+                UsedAt        = i.Ticket.UsedAt
+            })
+            .ToList();
+    }
+
+    public async Task<RefundResultDto> RequestRefundAsync(int orderId, string userId, RefundRequestDto dto)
+    {
+        var order = await _db.Orders
+            .Include(o => o.RefundRequests)
+            .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId)
+            ?? throw new KeyNotFoundException("Orden no encontrada.");
+
+        if (order.Status != OrderStatus.Paid)
+            throw new InvalidOperationException("Solo se pueden solicitar reembolsos de órdenes pagadas.");
+
+        if (order.RefundRequests.Any(r => r.Status == RefundStatus.Pending))
+            throw new InvalidOperationException("Ya existe una solicitud de reembolso pendiente para esta orden.");
+
+        var refund = new RefundRequest
+        {
+            OrderId           = orderId,
+            RequestedByUserId = userId,
+            Reason            = dto.Reason,
+            Status            = RefundStatus.Pending
+        };
+
+        _db.RefundRequests.Add(refund);
+        await _db.SaveChangesAsync();
+
+        return new RefundResultDto
+        {
+            RefundRequestId = refund.Id,
+            OrderId         = orderId,
+            Status          = refund.Status,
+            Reason          = refund.Reason,
+            RequestedAt     = refund.RequestedAt
+        };
     }
 
     // ── Private Helpers ───────────────────────────────────────────────────────

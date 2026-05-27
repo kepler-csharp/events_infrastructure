@@ -27,7 +27,7 @@ public class EmailService : IEmailService
     {
         var message = new MimeMessage();
         message.From.Add(
-            new MailboxAddress("Tickets", _config["Email:Username"])
+            new MailboxAddress("Tickets", _config["Email:Username"] ?? "udeaismael@gmail.com")
         );
         message.To.Add(new MailboxAddress(toName, toEmail));
         message.Subject = $"🎟️ Tu entrada para {data.EventName} - #{data.TicketId}";
@@ -72,6 +72,37 @@ public class EmailService : IEmailService
 
         await SendAsync(message);
     }
+    
+    // ── Forgot Password ───────────────────────────────────────────────────────
+
+    public async Task SendForgotPasswordEmailAsync(
+      string toEmail, string toName, string resetToken
+    )
+    {
+      var message = new MimeMessage();
+      message.From.Add(new MailboxAddress("TicketSphere", _config["Email:Username"]));
+      message.To.Add(new MailboxAddress(toName, toEmail));
+      message.Subject = "Recuperación de contraseña 🔐";
+      message.Body   = new TextPart(TextFormat.Html)
+      {
+        Text = BuildForgotPasswordHtml(toName, toEmail, resetToken)
+      };
+      await SendAsync(message);
+    }
+
+    public async Task SendAssistedRegistrationEmailAsync(
+        string toEmail, string toName, string tempPassword)
+    {
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress("Tickets", _config["Email:Username"]));
+        message.To.Add(new MailboxAddress(toName, toEmail));
+        message.Subject = "🎟️ Tu cuenta ha sido creada en el mostrador";
+        message.Body = new TextPart(TextFormat.Html)
+        {
+            Text = BuildAssistedRegistrationHtml(toName, toEmail, tempPassword)
+        };
+        await SendAsync(message);
+    }
 
     // ── Private Helpers ───────────────────────────────────────────────────────
 
@@ -93,6 +124,52 @@ public class EmailService : IEmailService
 
         _logger.LogInformation("Correo enviado exitosamente a {To}", message.To);
     }
+    
+    // ── HTML Builders ─────────────────────────────────────────────────────────
+    // Paleta Calcite: #DDDCDB | #FD7B41 | #EDBF9B | #3C4044
+
+    private static string BuildForgotPasswordHtml(
+        string toName, string email, string resetToken
+    ) => $@"
+<!DOCTYPE html><html lang=""es""><head><meta charset=""UTF-8""/></head>
+<body style=""margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;"">
+  <table width=""100%"" cellpadding=""0"" cellspacing=""0"" style=""padding:32px 0;"">
+    <tr><td align=""center"">
+      <table width=""580"" cellpadding=""0"" cellspacing=""0""
+        style=""background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);"">
+        <tr><td style=""background:#FD7B41;padding:32px 40px;text-align:center;"">
+          <h1 style=""margin:0;color:#fff;font-size:26px;"">🎟️ TicketSphere</h1>
+          <p style=""margin:8px 0 0;color:#fff;opacity:.9;font-size:14px;"">Recuperación de contraseña</p>
+        </td></tr>
+        <tr><td style=""padding:36px 40px;"">
+          <h2 style=""margin:0 0 16px;color:#3C4044;font-size:20px;"">Hola, {System.Net.WebUtility.HtmlEncode(toName)} 👋</h2>
+          <p style=""margin:0 0 20px;color:#3C4044;font-size:15px;line-height:1.7;"">
+            Recibimos una solicitud para restablecer la contraseña de tu cuenta.<br/>
+            Usa el token a continuación para crear una nueva contraseña.
+          </p>
+          <div style=""background:#DDDCDB;border-radius:8px;padding:20px;text-align:center;margin-bottom:20px;"">
+            <p style=""margin:0 0 8px;color:#3C4044;font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;"">Token de recuperación</p>
+            <p style=""margin:0;color:#FD7B41;font-size:13px;word-break:break-all;font-family:monospace;"">{System.Net.WebUtility.HtmlEncode(resetToken)}</p>
+          </div>
+          <div style=""background:#EDBF9B;border-radius:8px;padding:16px 20px;"">
+            <p style=""margin:0;color:#3C4044;font-size:13px;"">
+              <strong>¿Cómo usar el token?</strong><br/>
+              Envía una solicitud a <code>POST /api/auth/reset-password</code> con tu email,
+              el token y tu nueva contraseña.<br/><br/>
+              Este token expira en <strong>2 horas</strong>.
+            </p>
+          </div>
+          <p style=""margin:20px 0 0;color:#3C4044;font-size:13px;opacity:0.7;"">
+            Si no solicitaste esto, puedes ignorar este correo de forma segura.
+          </p>
+        </td></tr>
+        <tr><td style=""background:#3C4044;padding:20px 40px;text-align:center;"">
+          <p style=""margin:0;color:#DDDCDB;font-size:12px;"">© {DateTime.UtcNow.Year} TicketSphere</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>";
 
     private static string BuildTicketHtml(
         string toName,
@@ -274,4 +351,55 @@ public class EmailService : IEmailService
   </table>
 </body>
 </html>";
+
+    private static string BuildAssistedRegistrationHtml(
+        string toName, string email, string tempPassword
+    ) => $@"
+<!DOCTYPE html><html lang=""es""><head><meta charset=""UTF-8""/></head>
+<body style=""margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;"">
+  <table width=""100%"" cellpadding=""0"" cellspacing=""0"" style=""padding:32px 0;"">
+    <tr><td align=""center"">
+      <table width=""580"" cellpadding=""0"" cellspacing=""0""
+        style=""background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);"">
+        <tr><td style=""background:#FD7B41;padding:32px 40px;text-align:center;"">
+          <h1 style=""margin:0;color:#fff;font-size:26px;"">🎟️ TicketSphere</h1>
+          <p style=""margin:8px 0 0;color:#fff;opacity:.9;font-size:14px;"">Tu cuenta ha sido creada</p>
+        </td></tr>
+        <tr><td style=""padding:36px 40px;"">
+          <h2 style=""margin:0 0 16px;color:#3C4044;font-size:20px;"">¡Bienvenido, {System.Net.WebUtility.HtmlEncode(toName)}! 👋</h2>
+          <p style=""margin:0 0 20px;color:#3C4044;font-size:15px;line-height:1.7;"">
+            Un recepcionista ha creado tu cuenta en <strong>TicketSphere</strong>
+            para que puedas acceder a tus tickets digitales.
+            Tus credenciales de acceso son:
+          </p>
+          <table width=""100%"" cellpadding=""0"" cellspacing=""0""
+            style=""background:#DDDCDB;border-radius:8px;overflow:hidden;margin-bottom:20px;"">
+            <tr><td style=""background:#3C4044;padding:12px 20px;"">
+              <span style=""color:#FD7B41;font-weight:bold;font-size:13px;"">Credenciales de acceso</span>
+            </td></tr>
+            <tr><td style=""padding:16px 20px;"">
+              <p style=""margin:0 0 10px;"">
+                <span style=""color:#FD7B41;font-size:12px;font-weight:bold;"">CORREO</span><br/>
+                <span style=""color:#3C4044;font-size:15px;"">{System.Net.WebUtility.HtmlEncode(email)}</span>
+              </p>
+              <p style=""margin:0;"">
+                <span style=""color:#FD7B41;font-size:12px;font-weight:bold;"">CONTRASEÑA TEMPORAL</span><br/>
+                <span style=""color:#3C4044;font-size:15px;font-family:monospace;letter-spacing:2px;"">{System.Net.WebUtility.HtmlEncode(tempPassword)}</span>
+              </p>
+            </td></tr>
+          </table>
+          <div style=""background:#EDBF9B;border-radius:8px;padding:14px 20px;"">
+            <p style=""margin:0;color:#3C4044;font-size:13px;"">
+              <strong>⚠️ Por tu seguridad</strong>, te recomendamos cambiar tu contraseña la primera vez
+              que inicies sesión desde <code>POST /api/auth/change-password</code>.
+            </p>
+          </div>
+        </td></tr>
+        <tr><td style=""background:#3C4044;padding:20px 40px;text-align:center;"">
+          <p style=""margin:0;color:#DDDCDB;font-size:12px;"">© {DateTime.UtcNow.Year} TicketSphere</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>";
 }

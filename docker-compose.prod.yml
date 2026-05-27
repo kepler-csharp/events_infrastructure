@@ -86,6 +86,9 @@ services:
       
         mc mb --ignore-existing local/ticket-qrcodes &&
         mc anonymous set public local/ticket-qrcodes &&
+      
+        mc mb --ignore-existing local/event-posters &&
+        mc anonymous set public local/event-posters &&
         echo 'Bucket user-photos creado y configurado como público.'
       "
     networks:

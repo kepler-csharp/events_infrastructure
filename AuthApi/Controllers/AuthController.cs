@@ -1,4 +1,5 @@
 using ApiGeneral.AuthApi.DTOs;
+using ApiGeneral.AuthApi.DTOs.AuthDTOs;
 using ApiGeneral.AuthApi.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -97,4 +98,22 @@ public class AuthController : ControllerBase
     [HttpPut("change-password")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
         => await _service.ChangePassword(User, dto);
+    
+    // <summary>Solicita token de recuperación de contraseña → llega al correo.</summary>
+    [AllowAnonymous]
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest req)
+        => await _service.ForgotPassword(req);
+    
+    /// <summary>Restablece la contraseña con el token recibido por correo.</summary>
+    [AllowAnonymous]
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest req)
+        => await _service.ResetPassword(req);
+
+    /// <summary>Renueva el access token usando el refresh token (sin re-login).</summary>
+    [AllowAnonymous]
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh([FromBody] RefreshTokenDto dto)
+        => await _service.RefreshToken(dto);
 }

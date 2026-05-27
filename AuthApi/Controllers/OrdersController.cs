@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using ApiGeneral.AuthApi.DTOs.OrderDTOs;
 using ApiGeneral.AuthApi.DTOs.Shared;
+using ApiGeneral.AuthApi.DTOs.TicketDTOs;
 using ApiGeneral.AuthApi.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -49,5 +50,33 @@ public class OrdersController : ControllerBase
         var result = await _orders.GetByIdAsync(id, UserId);
         if (result == null) return NotFound(ApiResponse<object>.Fail("Order not found."));
         return Ok(ApiResponse<OrderDto>.Ok(result));
+    }
+
+    /// <summary>List all tickets (with QR) for a specific order</summary>
+    [HttpGet("{id:int}/tickets")]
+    public async Task<IActionResult> GetOrderTickets(int id)
+    {
+        var result = await _orders.GetOrderTicketsAsync(id, UserId);
+        if (result == null) return NotFound(ApiResponse<object>.Fail("Order not found."));
+        return Ok(ApiResponse<List<OrderTicketDto>>.Ok(result));
+    }
+
+    /// <summary>Request a refund for a paid order (goes into Admin approval flow)</summary>
+    [HttpPost("{id:int}/refund")]
+    public async Task<IActionResult> RequestRefund(int id, [FromBody] RefundRequestDto dto)
+    {
+        try
+        {
+            var result = await _orders.RequestRefundAsync(id, UserId, dto);
+            return Ok(ApiResponse<RefundResultDto>.Ok(result, "Solicitud de reembolso enviada. Pendiente de revisión por el administrador."));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse<object>.Fail(ex.Message));
+        }
     }
 }

@@ -2,16 +2,14 @@ namespace ApiGeneral.AuthApi.Services.Interfaces;
 
 public interface IEmailService
 {
-    Task SendTicketEmailAsync(
-        string toEmail,
-        string toName,
-        TicketEmailData data
-    );
+    Task SendTicketEmailAsync(string toEmail, string toName, TicketEmailData data);
+    Task SendWelcomeEmailAsync(string toEmail, string toName);
+    Task SendForgotPasswordEmailAsync(string toEmail, string toName, string resetToken);
 
-    Task SendWelcomeEmailAsync(
-        string toEmail,
-        string toName
-    );
+    /// <summary>
+    /// Notifica al cliente registrado en mostrador su contraseña temporal.
+    /// </summary>
+    Task SendAssistedRegistrationEmailAsync(string toEmail, string toName, string tempPassword);
 }
 
 public class TicketEmailData

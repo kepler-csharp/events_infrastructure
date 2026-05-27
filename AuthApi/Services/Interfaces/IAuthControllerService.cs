@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using ApiGeneral.AuthApi.DTOs;
+using ApiGeneral.AuthApi.DTOs.AuthDTOs;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ApiGeneral.AuthApi.Services.Interfaces;
@@ -30,4 +31,13 @@ public interface IAuthControllerService
         ClaimsPrincipal principal,
         ChangePasswordDto dto
     );
+    
+    /// <summary>Envía un correo con token para restablecer contraseña.</summary>
+    Task<IActionResult> ForgotPassword(ForgotPasswordRequest req);
+
+    /// <summary>Restablece la contraseña usando el token recibido por correo.</summary>
+    Task<IActionResult> ResetPassword(ResetPasswordRequest req);
+
+    /// <summary>Renueva el access token usando un refresh token válido.</summary>
+    Task<IActionResult> RefreshToken(RefreshTokenDto dto);
 }

@@ -23,4 +23,13 @@ public class ScannerController : ControllerBase
             return BadRequest(ApiResponse<ValidateTicketResult>.Ok(result, result.Message));
         return Ok(ApiResponse<ValidateTicketResult>.Ok(result, "Access granted."));
     }
+
+    /// <summary>Historial de validaciones del día actual (Admin y Scanner)</summary>
+    [HttpGet("history")]
+    [Authorize(Roles = "Admin,Scanner")]
+    public async Task<IActionResult> GetTodayHistory()
+    {
+        var result = await _scanner.GetTodayHistoryAsync();
+        return Ok(ApiResponse<List<ScannerHistoryDto>>.Ok(result));
+    }
 }

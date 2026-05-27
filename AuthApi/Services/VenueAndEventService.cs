@@ -3,8 +3,12 @@ using ApiGeneral.AuthApi.DTOs.EventDTOs;
 using ApiGeneral.AuthApi.DTOs.Shared;
 using ApiGeneral.AuthApi.DTOs.VenueDTOs;
 using ApiGeneral.AuthApi.Entities;
+using ApiGeneral.AuthApi.Entities.Enums;
 using ApiGeneral.AuthApi.Services.Interfaces;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Minio;
+using Minio.DataModel.Args;
 
 namespace ApiGeneral.AuthApi.Services;
 
@@ -12,7 +16,12 @@ namespace ApiGeneral.AuthApi.Services;
 public class VenueService : IVenueService
 {
     private readonly AppDbContext _db;
-    public VenueService(AppDbContext db) => _db = db;
+    private readonly IConfiguration _config;
+    public VenueService(AppDbContext db, IConfiguration confi)
+    {
+        _db = db;
+        _config = confi;
+    }
 
     public async Task<PagedResult<VenueDto>> GetAllAsync(int page, int pageSize)
     {
@@ -60,8 +69,16 @@ public class VenueService : IVenueService
 // ─── EventService ─────────────────────────────────────────────────────────────
 public class EventService : IEventService
 {
-    private readonly AppDbContext _db;
-    public EventService(AppDbContext db) => _db = db;
+    private readonly AppDbContext  _db;
+    private readonly IMinioClient  _minio;
+    private readonly IConfiguration _config;
+
+    public EventService(AppDbContext db, IMinioClient minio, IConfiguration config)
+    {
+        _db     = db;
+        _minio  = minio;
+        _config = config;
+    }
 
     public async Task<PagedResult<EventDto>> GetAllAsync(int page, int pageSize, bool? isActive)
     {
@@ -121,6 +138,57 @@ public class EventService : IEventService
         return true;
     }
 
+    public async Task<EventDto?> UploadPhotoAsync(int id, IFormFile file)
+    {
+        var ev = await _db.Events.Include(x => x.Venue).FirstOrDefaultAsync(x => x.Id == id);
+        if (ev == null) return null;
+        
+        const string bucketName = "event-posters";
+        
+        var exists = 
+            await _minio.BucketExistsAsync(
+                new BucketExistsArgs().
+                    WithBucket(bucketName)
+            );
+        
+        if (!exists)
+            await _minio.MakeBucketAsync(
+                new MakeBucketArgs()
+                    .WithBucket(bucketName)
+            );
+
+        var fileName = $"event_{id}_{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+        using var stream = file.OpenReadStream();
+
+        await _minio.PutObjectAsync(
+            new PutObjectArgs()
+                .WithBucket(bucketName)
+                .WithObject(fileName)
+                .WithStreamData(stream)
+                .WithObjectSize(stream.Length)
+                .WithContentType(file.ContentType)
+        );
+
+        String? url = _config["Minio:EndpointOut"];
+        var photoUrl =
+            $"http://{url}/{bucketName}/{fileName}";
+        
+        ev.UpdatedAt  = DateTime.UtcNow;
+        
+        var Event = await _db.Events.Include(x => x.Venue)
+            .FirstOrDefaultAsync(x => x.Id == id);
+
+        if (Event == null)
+        {
+            return null;
+        }
+
+        Event.PosterUrl = photoUrl;
+        
+        await _db.SaveChangesAsync();
+        return ToDto(ev);
+    }
+
     private static EventDto ToDto(Event e) => new()
     {
         Id = e.Id, Name = e.Name, Description = e.Description, PosterUrl = e.PosterUrl,
@@ -128,4 +196,66 @@ public class EventService : IEventService
         Type = e.Type, DurationMinutes = e.DurationMinutes,
         IsActive = e.IsActive, CreatedAt = e.CreatedAt
     };
+
+    public async Task<EventStatsDto?> GetStatsAsync(int eventId)
+    {
+        var ev = await _db.Events
+            .Include(e => e.Showtimes)
+                .ThenInclude(st => st.Seats)
+                    .ThenInclude(s => s.OrderItem)
+            .FirstOrDefaultAsync(e => e.Id == eventId);
+
+        if (ev == null) return null;
+
+        var allSeats     = ev.Showtimes.SelectMany(st => st.Seats).ToList();
+        var soldSeats    = allSeats.Where(s => s.Status == SeatStatus.Sold).ToList();
+        var reservedSeats = allSeats.Where(s => s.Status == SeatStatus.Reserved).ToList();
+
+        var totalRevenue = soldSeats
+            .Where(s => s.OrderItem != null)
+            .Sum(s => s.OrderItem!.PricePaid);
+
+        var totalOrders = soldSeats
+            .Where(s => s.OrderItem != null)
+            .Select(s => s.OrderItem!.OrderId)
+            .Distinct()
+            .Count();
+
+        var showtimeStats = ev.Showtimes.Select(st =>
+        {
+            var stSeats  = st.Seats.ToList();
+            var stSold   = stSeats.Count(s => s.Status == SeatStatus.Sold);
+            var stRevenue = stSeats
+                .Where(s => s.Status == SeatStatus.Sold && s.OrderItem != null)
+                .Sum(s => s.OrderItem!.PricePaid);
+
+            return new ShowtimeStatsDto
+            {
+                ShowtimeId   = st.Id,
+                StartTime    = st.StartTime,
+                TotalSeats   = stSeats.Count,
+                SoldSeats    = stSold,
+                OccupancyPct = stSeats.Count > 0
+                    ? Math.Round((double)stSold / stSeats.Count * 100, 1)
+                    : 0,
+                Revenue = stRevenue
+            };
+        }).ToList();
+
+        return new EventStatsDto
+        {
+            EventId        = ev.Id,
+            EventName      = ev.Name,
+            TotalSeats     = allSeats.Count,
+            SoldSeats      = soldSeats.Count,
+            ReservedSeats  = reservedSeats.Count,
+            AvailableSeats = allSeats.Count - soldSeats.Count - reservedSeats.Count,
+            OccupancyPct   = allSeats.Count > 0
+                ? Math.Round((double)soldSeats.Count / allSeats.Count * 100, 1)
+                : 0,
+            TotalRevenue   = totalRevenue,
+            TotalOrders    = totalOrders,
+            Showtimes      = showtimeStats
+        };
+    }
 }

@@ -57,4 +57,31 @@ public class EventsController : ControllerBase
         if (!ok) return NotFound(ApiResponse<object>.Fail("Event not found."));
         return Ok(ApiResponse<object>.Ok(null!, "Event deactivated."));
     }
+    
+    /// <summary>
+    /// Sube o reemplaza la imagen/póster del evento en MinIO.
+    /// Content-Type: multipart/form-data, campo: file
+    /// </summary>
+    [HttpPost("{id:int}/upload-photo")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UploadPhoto(int id, IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(ApiResponse<object>.Fail("No file uploaded."));
+
+        var result = await _events.UploadPhotoAsync(id, file);
+        if (result == null) return NotFound(ApiResponse<object>.Fail("Event not found."));
+
+        return Ok(ApiResponse<EventDto>.Ok(result, "Event photo uploaded."));
+    }
+
+    /// <summary>Estadísticas de ocupación y ventas de un evento (solo Admin).</summary>
+    [HttpGet("{id:int}/stats")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetStats(int id)
+    {
+        var result = await _events.GetStatsAsync(id);
+        if (result == null) return NotFound(ApiResponse<object>.Fail("Event not found."));
+        return Ok(ApiResponse<EventStatsDto>.Ok(result));
+    }
 }
