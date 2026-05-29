@@ -47,6 +47,8 @@ builder.Services.AddScoped<IScannerService,  ScannerService>();
 builder.Services.AddScoped<IAdminService,    AdminService>();
 builder.Services.AddScoped<IReceptionistService, ReceptionistService>();
 
+builder.Services.AddHostedService<ExpiredReservationsCleanupService>();
+
 builder.Services
     .AddIdentity<ApplicationUser, IdentityRole>(options =>
     {
