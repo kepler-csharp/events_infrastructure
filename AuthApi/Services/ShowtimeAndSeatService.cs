@@ -92,20 +92,44 @@ public class ShowtimeService : IShowtimeService
 // ─── SeatService (with Redis locks) ──────────────────────────────────────────
 public class SeatService : ISeatService
 {
-    private readonly AppDbContext        _db;
+    private readonly AppDbContext _db;
     private readonly IConnectionMultiplexer _redis;
+
     private static readonly TimeSpan ReservationTtl = TimeSpan.FromMinutes(5);
+
+    private static TimeZoneInfo GetColombiaTimeZone()
+    {
+        try
+        {
+            // Windows
+            return TimeZoneInfo.FindSystemTimeZoneById("SA Pacific Standard Time");
+        }
+        catch
+        {
+            // Linux / Docker / Kubernetes
+            return TimeZoneInfo.FindSystemTimeZoneById("America/Bogota");
+        }
+    }
+
+    private static DateTime ToColombiaTime(DateTime utcDate)
+    {
+        var tz = GetColombiaTimeZone();
+
+        return TimeZoneInfo.ConvertTimeFromUtc(
+            DateTime.SpecifyKind(utcDate, DateTimeKind.Utc),
+            tz);
+    }
 
     public SeatService(AppDbContext db, IConnectionMultiplexer redis)
     {
-        _db    = db;
+        _db = db;
         _redis = redis;
     }
 
     public async Task<ReservationResult> ReserveAsync(string userId, ReserveSeatsRequest request)
     {
-        var redisDb    = _redis.GetDatabase();
-        var lockKeys   = request.SeatIds.Select(id => $"seat_lock:{id}").ToList();
+        var redisDb = _redis.GetDatabase();
+        var lockKeys = request.SeatIds.Select(id => $"seat_lock:{id}").ToList();
         var acquiredKeys = new List<string>();
 
         try
@@ -113,32 +137,59 @@ public class SeatService : ISeatService
             // Acquire a short Redis lock per seat to prevent race conditions
             foreach (var key in lockKeys)
             {
-                var acquired = await redisDb.StringSetAsync(key, userId, TimeSpan.FromSeconds(10), When.NotExists);
+                var acquired = await redisDb.StringSetAsync(
+                    key,
+                    userId,
+                    TimeSpan.FromSeconds(10),
+                    When.NotExists);
+
                 if (!acquired)
-                    return new ReservationResult { Success = false, Message = "One or more seats are being reserved. Try again." };
+                    return new ReservationResult
+                    {
+                        Success = false,
+                        Message = "One or more seats are being reserved. Try again."
+                    };
+
                 acquiredKeys.Add(key);
             }
 
             var seats = await _db.Seats
-                .Where(s => request.SeatIds.Contains(s.Id) && s.ShowtimeId == request.ShowtimeId)
+                .Where(s =>
+                    request.SeatIds.Contains(s.Id) &&
+                    s.ShowtimeId == request.ShowtimeId)
                 .ToListAsync();
 
             if (seats.Count != request.SeatIds.Count)
-                return new ReservationResult { Success = false, Message = "Some seats were not found." };
+                return new ReservationResult
+                {
+                    Success = false,
+                    Message = "Some seats were not found."
+                };
 
             var unavailable = seats.Where(s =>
                 s.Status == SeatStatus.Sold ||
-                (s.Status == SeatStatus.Reserved && s.ReservedUntil > DateTime.UtcNow && s.ReservedByUserId != userId)
+                (s.Status == SeatStatus.Reserved &&
+                 s.ReservedUntil > DateTime.UtcNow &&
+                 s.ReservedByUserId != userId)
             ).ToList();
 
             if (unavailable.Any())
-                return new ReservationResult { Success = false, Message = $"{unavailable.Count} seat(s) are no longer available." };
+                return new ReservationResult
+                {
+                    Success = false,
+                    Message = $"{unavailable.Count} seat(s) are no longer available."
+                };
 
-            var expiresAt = DateTime.UtcNow.Add(ReservationTtl);
+            // Guardar SIEMPRE UTC
+            var expiresAtUtc = DateTime.UtcNow.Add(ReservationTtl);
+
             foreach (var seat in seats)
             {
-                seat.Status           = SeatStatus.Reserved;
-                seat.ReservedUntil    = expiresAt;
+                seat.Status = SeatStatus.Reserved;
+
+                // UTC en DB
+                seat.ReservedUntil = expiresAtUtc;
+
                 seat.ReservedByUserId = userId;
             }
 
@@ -146,10 +197,12 @@ public class SeatService : ISeatService
 
             return new ReservationResult
             {
-                Success         = true,
-                Message         = "Seats reserved. You have 5 minutes to complete purchase.",
+                Success = true,
+                Message = "Seats reserved. You have 5 minutes to complete purchase.",
                 ReservedSeatIds = seats.Select(s => s.Id).ToList(),
-                ExpiresAt       = expiresAt
+
+                // SOLO convertir para frontend/cliente
+                ExpiresAt = ToColombiaTime(expiresAtUtc)
             };
         }
         finally
@@ -162,16 +215,20 @@ public class SeatService : ISeatService
     public async Task ReleaseAsync(string userId, List<int> seatIds)
     {
         var seats = await _db.Seats
-            .Where(s => seatIds.Contains(s.Id) && s.ReservedByUserId == userId && s.Status == SeatStatus.Reserved)
+            .Where(s =>
+                seatIds.Contains(s.Id) &&
+                s.ReservedByUserId == userId &&
+                s.Status == SeatStatus.Reserved)
             .ToListAsync();
 
         foreach (var seat in seats)
         {
-            seat.Status           = SeatStatus.Available;
-            seat.ReservedUntil    = null;
+            seat.Status = SeatStatus.Available;
+            seat.ReservedUntil = null;
             seat.ReservedByUserId = null;
         }
 
-        if (seats.Any()) await _db.SaveChangesAsync();
+        if (seats.Any())
+            await _db.SaveChangesAsync();
     }
 }
