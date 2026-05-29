@@ -63,20 +63,37 @@ public class OrdersController : ControllerBase
 
     /// <summary>Request a refund for a paid order (goes into Admin approval flow)</summary>
     [HttpPost("{id:int}/refund")]
-    public async Task<IActionResult> RequestRefund(int id, [FromBody] RefundRequestDto dto)
+    public async Task<IActionResult> RequestRefund(
+        int id,
+        [FromBody] RefundRequestDto dto)
     {
         try
         {
-            var result = await _orders.RequestRefundAsync(id, UserId, dto);
-            return Ok(ApiResponse<RefundResultDto>.Ok(result, "Solicitud de reembolso enviada. Pendiente de revisión por el administrador."));
+            var result = await _orders.RequestRefundAsync(
+                id,
+                UserId,
+                dto);
+
+            return Ok(
+                ApiResponse<RefundResultDto>.Ok(
+                    result,
+                    "Solicitud de reembolso enviada. Pendiente de revisión por el administrador."));
         }
         catch (KeyNotFoundException ex)
         {
-            return NotFound(ApiResponse<object>.Fail(ex.Message));
+            return NotFound(
+                ApiResponse<object>.Fail(ex.Message));
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(ApiResponse<object>.Fail(ex.Message));
+            return BadRequest(
+                ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500,
+                ApiResponse<object>.Fail(
+                    $"Internal error: {ex.Message}"));
         }
     }
 }
