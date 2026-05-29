@@ -15,6 +15,29 @@ public class ShowtimeService : IShowtimeService
 {
     private readonly AppDbContext _db;
     public ShowtimeService(AppDbContext db) => _db = db;
+    
+    private static TimeZoneInfo GetColombiaTimeZone()
+    {
+        try
+        {
+            // Windows
+            return TimeZoneInfo.FindSystemTimeZoneById("SA Pacific Standard Time");
+        }
+        catch
+        {
+            // Linux / Docker / Kubernetes
+            return TimeZoneInfo.FindSystemTimeZoneById("America/Bogota");
+        }
+    }
+
+    private static DateTime ToColombiaTime(DateTime utcDate)
+    {
+        var tz = GetColombiaTimeZone();
+
+        return TimeZoneInfo.ConvertTimeFromUtc(
+            DateTime.SpecifyKind(utcDate, DateTimeKind.Utc),
+            tz);
+    }
 
     public async Task<PagedResult<ShowtimeDto>> GetAllAsync(int page, int pageSize, int? eventId)
     {
@@ -67,16 +90,25 @@ public class ShowtimeService : IShowtimeService
 
     public async Task<List<SeatDto>> GetSeatsAsync(int showtimeId)
     {
-        return await _db.Seats
+        var seats = await _db.Seats
             .Where(s => s.ShowtimeId == showtimeId)
-            .OrderBy(s => s.Row).ThenBy(s => s.Number)
-            .Select(s => new SeatDto
-            {
-                Id = s.Id, Row = s.Row, Number = s.Number,
-                Label = s.Row + s.Number.ToString(),
-                Type = s.Type, Status = s.Status, ReservedUntil = s.ReservedUntil
-            })
+            .OrderBy(s => s.Row)
+            .ThenBy(s => s.Number)
             .ToListAsync();
+
+        return seats.Select(s => new SeatDto
+        {
+            Id = s.Id,
+            Row = s.Row,
+            Number = s.Number,
+            Label = s.Row + s.Number.ToString(),
+            Type = s.Type,
+            Status = s.Status,
+
+            ReservedUntil = s.ReservedUntil.HasValue
+                ? ToColombiaTime(s.ReservedUntil.Value)
+                : null
+        }).ToList();
     }
 
     private static ShowtimeDto ToDto(Showtime s) => new()
