@@ -52,12 +52,25 @@ public class OrderService : IOrderService
 
         var invalid = seats.Where(s =>
             s.Status != SeatStatus.Reserved ||
-            s.ReservedByUserId != userId    ||
+            s.ReservedByUserId != userId ||
             s.ReservedUntil < DateTime.UtcNow
         ).ToList();
 
         if (invalid.Any())
-            throw new InvalidOperationException("Some seats are not reserved by you or the reservation expired.");
+        {
+            var details = invalid.Select(s =>
+                $"SeatId={s.Id}, " +
+                $"Status={s.Status}, " +
+                $"ReservedByUserId={s.ReservedByUserId}, " +
+                $"ReservedUntil={s.ReservedUntil:O}, " +
+                $"CurrentUser={userId}, " +
+                $"UtcNow={DateTime.UtcNow:O}"
+            );
+
+            throw new InvalidOperationException(
+                "Invalid seats: " + string.Join(" | ", details)
+            );
+        }
 
         var total = seats.Sum(s => s.Showtime.BasePrice);
 
