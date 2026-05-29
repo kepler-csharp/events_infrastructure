@@ -48,6 +48,7 @@ builder.Services.AddScoped<IAdminService,    AdminService>();
 builder.Services.AddScoped<IReceptionistService, ReceptionistService>();
 
 builder.Services.AddHostedService<ExpiredReservationsCleanupService>();
+builder.Services.AddHostedService<ExpiredPendingOrdersCleanupService>();
 
 builder.Services
     .AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -61,8 +62,6 @@ builder.Services
     })
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
-
-var jwt = builder.Configuration.GetSection("Jwt");
 
 builder.Services
     .AddAuthentication(options =>
@@ -154,7 +153,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(
     )
 );
 
-builder.Services.AddSingleton<IMinioClient>(sp =>
+builder.Services.AddSingleton<IMinioClient>(_ =>
 {
     var config =
         builder.Configuration.GetSection("Minio");
