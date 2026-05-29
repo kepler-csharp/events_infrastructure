@@ -25,7 +25,7 @@ public class ReceptionistService : IReceptionistService
     private readonly IConnectionMultiplexer       _redis;
 
     private const string QrBucket            = "ticket-qrcodes";
-    private static readonly TimeSpan AssistedReservationTtl = TimeSpan.FromMinutes(30);
+    private static readonly TimeSpan AssistedReservationTtl = TimeSpan.FromMinutes(5);
 
     public ReceptionistService(
         AppDbContext                 db,
@@ -142,7 +142,7 @@ public class ReceptionistService : IReceptionistService
             return new AssistedReserveResultDto
             {
                 Success         = true,
-                Message         = "Asientos reservados. Tienes 30 minutos para completar la venta.",
+                Message         = "Asientos reservados. Tienes 5 minutos para completar la venta.",
                 ReservedSeatIds = seats.Select(s => s.Id).ToList(),
                 ExpiresAt       = expiresAt
             };
