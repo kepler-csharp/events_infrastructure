@@ -27,6 +27,27 @@ public class ReceptionistService : IReceptionistService
     private const string QrBucket            = "ticket-qrcodes";
     private static readonly TimeSpan AssistedReservationTtl = TimeSpan.FromMinutes(5);
 
+    private static TimeZoneInfo GetColombiaTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("SA Pacific Standard Time");
+        }
+        catch
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("America/Bogota");
+        }
+    }
+
+    private static DateTime ToColombiaTime(DateTime utcDate)
+    {
+        var tz = GetColombiaTimeZone();
+    
+        return TimeZoneInfo.ConvertTimeFromUtc(
+            DateTime.SpecifyKind(utcDate, DateTimeKind.Utc),
+            tz);
+    }
+
     public ReceptionistService(
         AppDbContext                 db,
         UserManager<ApplicationUser> users,
@@ -128,12 +149,16 @@ public class ReceptionistService : IReceptionistService
                     Message = $"{unavailable.Count} asiento(s) ya no están disponibles."
                 };
 
-            // 30-min TTL for assisted sales
-            var expiresAt = DateTime.UtcNow.Add(AssistedReservationTtl);
+            // 5-min TTL for assisted sales
+            var expiresAtUtc = DateTime.UtcNow.Add(AssistedReservationTtl);
+
             foreach (var seat in seats)
             {
                 seat.Status           = SeatStatus.Reserved;
-                seat.ReservedUntil    = expiresAt;
+
+                // Guardar SIEMPRE en UTC en DB
+                seat.ReservedUntil    = expiresAtUtc;
+
                 seat.ReservedByUserId = request.CustomerUserId;
             }
 
@@ -144,7 +169,9 @@ public class ReceptionistService : IReceptionistService
                 Success         = true,
                 Message         = "Asientos reservados. Tienes 5 minutos para completar la venta.",
                 ReservedSeatIds = seats.Select(s => s.Id).ToList(),
-                ExpiresAt       = expiresAt
+
+                // SOLO convertir para mostrar al cliente/frontend
+                ExpiresAt       = ToColombiaTime(expiresAtUtc)
             };
         }
         finally
