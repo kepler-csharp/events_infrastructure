@@ -22,9 +22,22 @@ public class OrdersController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateOrderRequest request)
     {
-        var result = await _orders.CreateAsync(UserId, request);
-        return Created($"/api/orders/{result.Id}",
-            ApiResponse<OrderDto>.Ok(result, "Order created. Proceed to payment."));
+        try
+        {
+            var result = await _orders.CreateAsync(UserId, request);
+    
+            return Created(
+                $"/api/orders/{result.Id}",
+                ApiResponse<OrderDto>.Ok(
+                    result,
+                    "Order created. Proceed to payment."
+                )
+            );
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ex.ToString());
+        }
     }
 
     /// <summary>Pay an order (simulated payment → generates QR tickets)</summary>
