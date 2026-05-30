@@ -40,8 +40,10 @@ public class OrderService : IOrderService
         _config = config;
     }
 
+    // ── CREATE ORDER ────────────────────────────────────────────────────────
     public async Task<OrderDto> CreateAsync(string userId, CreateOrderRequest request)
     {
+        // Obtener los asientos solicitados
         var seats = await _db.Seats
             .Include(s => s.Showtime)
             .Where(s => request.SeatIds.Contains(s.Id))
@@ -50,28 +52,35 @@ public class OrderService : IOrderService
         if (seats.Count != request.SeatIds.Count)
             throw new InvalidOperationException("Some seats were not found.");
 
-        var invalid = seats.Where(s =>
+        // Validar reservación de usuario
+        var invalidSeats = seats.Where(s =>
             s.Status != SeatStatus.Reserved ||
             s.ReservedByUserId != userId ||
             s.ReservedUntil < DateTime.UtcNow
         ).ToList();
 
-        if (invalid.Any())
+        if (invalidSeats.Any())
         {
-            var details = invalid.Select(s =>
-                $"SeatId={s.Id}, " +
-                $"Status={s.Status}, " +
-                $"ReservedByUserId={s.ReservedByUserId}, " +
-                $"ReservedUntil={s.ReservedUntil:O}, " +
-                $"CurrentUser={userId}, " +
-                $"UtcNow={DateTime.UtcNow:O}"
-            );
-
-            throw new InvalidOperationException(
-                "Invalid seats: " + string.Join(" | ", details)
-            );
+            var details = string.Join(" | ", invalidSeats.Select(s =>
+                $"SeatId={s.Id}, Status={s.Status}, ReservedByUserId={s.ReservedByUserId}, ReservedUntil={s.ReservedUntil:O}, CurrentUser={userId}, UtcNow={DateTime.UtcNow:O}"
+            ));
+            throw new InvalidOperationException($"Invalid seats: {details}");
         }
 
+        // Verificar si algún asiento ya está vendido
+        var occupiedSeats = await _db.OrderItems
+            .Include(oi => oi.Order)
+            .Where(oi => request.SeatIds.Contains(oi.SeatId) &&
+                         oi.Order.Status == OrderStatus.Paid)
+            .ToListAsync();
+
+        if (occupiedSeats.Any())
+        {
+            var ids = string.Join(",", occupiedSeats.Select(o => o.SeatId));
+            throw new InvalidOperationException($"Seats already sold: {ids}");
+        }
+
+        // Calcular total y crear orden
         var total = seats.Sum(s => s.Showtime.BasePrice);
 
         var order = new Order
@@ -88,9 +97,11 @@ public class OrderService : IOrderService
 
         _db.Orders.Add(order);
         await _db.SaveChangesAsync();
+
         return await BuildOrderDtoAsync(order.Id, userId);
     }
 
+    // ── PAY ORDER ───────────────────────────────────────────────────────────
     public async Task<PaymentResultDto> PayAsync(string userId, PayOrderRequest request)
     {
         var order = await _db.Orders
@@ -118,7 +129,7 @@ public class OrderService : IOrderService
             PaidAt     = DateTime.UtcNow
         };
         _db.Payments.Add(payment);
-        
+
         // Ensure QR bucket exists
         await EnsureBucketAsync(QrBucket);
 
@@ -152,7 +163,7 @@ public class OrderService : IOrderService
         order.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
-        // Send email (fire and forget with error logging; don't fail the payment)
+        // Send email (fire and forget)
         var user = await _users.FindByIdAsync(userId);
         if (user != null)
         {
@@ -177,8 +188,7 @@ public class OrderService : IOrderService
         };
     }
 
-    // ── Queries ───────────────────────────────────────────────────────────────
-
+    // ── RESTO DEL SERVICE ───────────────────────────────────────────────────
     public async Task<PagedResult<OrderDto>> GetUserOrdersAsync(
         string userId, int page, int pageSize
     )
@@ -274,8 +284,7 @@ public class OrderService : IOrderService
         };
     }
 
-    // ── Private Helpers ───────────────────────────────────────────────────────
-
+    // ── PRIVATE HELPERS ─────────────────────────────────────────────────────
     private async Task<OrderDto> BuildOrderDtoAsync(int orderId, string userId)
     {
         var order = await _db.Orders
@@ -335,7 +344,6 @@ public class OrderService : IOrderService
         }
         catch
         {
-            // No bloquear el pago si falla el upload
             return null;
         }
     }
