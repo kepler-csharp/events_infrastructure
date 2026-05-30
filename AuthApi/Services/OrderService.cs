@@ -43,7 +43,6 @@ public class OrderService : IOrderService
     // ── CREATE ORDER ────────────────────────────────────────────────────────
     public async Task<OrderDto> CreateAsync(string userId, CreateOrderRequest request)
     {
-        // Obtener los asientos solicitados
         var seats = await _db.Seats
             .Include(s => s.Showtime)
             .Where(s => request.SeatIds.Contains(s.Id))
@@ -52,7 +51,7 @@ public class OrderService : IOrderService
         if (seats.Count != request.SeatIds.Count)
             throw new InvalidOperationException("Some seats were not found.");
 
-        // Validar reservación de usuario
+        // Validar que los asientos estén reservados por el usuario y no expirados
         var invalidSeats = seats.Where(s =>
             s.Status != SeatStatus.Reserved ||
             s.ReservedByUserId != userId ||
@@ -67,20 +66,17 @@ public class OrderService : IOrderService
             throw new InvalidOperationException($"Invalid seats: {details}");
         }
 
-        // Verificar si algún asiento ya está vendido
-        var occupiedSeats = await _db.OrderItems
-            .Include(oi => oi.Order)
-            .Where(oi => request.SeatIds.Contains(oi.SeatId) &&
-                         oi.Order.Status == OrderStatus.Paid)
+        // 🔹 NUEVA VALIDACIÓN: revisar si ya existe un OrderItem para alguno de estos asientos
+        var existingOrderItems = await _db.OrderItems
+            .Where(oi => request.SeatIds.Contains(oi.SeatId))
             .ToListAsync();
 
-        if (occupiedSeats.Any())
+        if (existingOrderItems.Any())
         {
-            var ids = string.Join(",", occupiedSeats.Select(o => o.SeatId));
-            throw new InvalidOperationException($"Seats already sold: {ids}");
+            var ids = string.Join(",", existingOrderItems.Select(oi => oi.SeatId));
+            throw new InvalidOperationException($"Seats already reserved/sold in another order: {ids}");
         }
 
-        // Calcular total y crear orden
         var total = seats.Sum(s => s.Showtime.BasePrice);
 
         var order = new Order
